@@ -5,7 +5,7 @@ from agent.templates import GraphState, NewsArticle, OpenAI
 def email_outreach(model: OpenAI, spice_context: str, article: NewsArticle) -> str:
     """
     This node drafts cold outreach emails to each identified business entity.
-    Updates `email_draft` as a dict mapping entity name -> email text.
+    Updates `email_drafts` as a dict mapping entity name -> email text.
     """
     opportunity = article.opportunity.opportunity
     justification = article.opportunity.justification
@@ -79,7 +79,9 @@ def email_outreach_node(state: GraphState) -> GraphState:
     Handles the email outreach node.
     Drafts outreach emails for each identified business entity and updates the state.
     """
-    for article in state.get("relevant_articles", []):
+    for article in state.get("articles", []):
         if article.relevance.is_relevant:
-            article.email_draft = email_outreach(state)
+            article.email_drafts = email_outreach(
+                state["model"], state["spice_context"], article
+            )
     return state

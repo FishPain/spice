@@ -90,7 +90,7 @@ class NewsArticle(BaseModel):
     relevance: RelevanceScore = None
     business_entities: List[BusinessEntityItem] = []
     opportunity: Opportunity = None
-    email_draft: List[str] = None
+    email_drafts: List[str] = None
 
 
 class GraphState(TypedDict):
