@@ -58,7 +58,8 @@ The Urban Redevelopment Authority (URA) and GovTech have partnered with ST Engin
 
     structured_output_parser = model.with_structured_output(BusinessEntity)
     response = structured_output_parser.invoke([HumanMessage(content=prompt)])
+    if state.get("business_entity", None) is None:
+        state["business_entity"] = []
 
-    # Access list of entities from root object field
-    state["business_entity"] = response.entities
+    state["business_entity"].append(response.entities)
     return state

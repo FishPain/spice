@@ -48,6 +48,10 @@ Response:
 """
     structured_output_parser = model.with_structured_output(Opportunity)
     decision_response = structured_output_parser.invoke([HumanMessage(content=prompt)])
-    state["opportunity"] = decision_response.opportunity
-    state["justification"] = decision_response.justification
+    if state.get("opportunity", None) is None:
+        state["opportunity"] = []
+    state["opportunity"].append(decision_response.opportunity)
+    if state.get("justification", None) is None:
+        state["justification"] = []
+    state["justification"].append(decision_response.justification)
     return state

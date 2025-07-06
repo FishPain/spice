@@ -14,7 +14,7 @@ class GraphState(TypedDict):
     current_index: int  # Index of the current article
     current_article: dict  # Current article being processed
     aggregated_results: List[dict]  # Stores relevance/entity/opportunity per article
-    relevance: dict
+    relevance: List[dict]
     business_entity: List[dict]
     opportunity: str
     justification: str

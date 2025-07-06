@@ -83,9 +83,7 @@ with left_col:
 output = st.session_state.output
 if output:
     scraped_data = output.get("scraped_data", [])
-    if not scraped_data:
-        st.info("🕵️‍♀️ No relevant articles to display.")
-    else:
+    if scraped_data:
         st.markdown("### 📑 Select and Review Articles")
 
         titles = [a.get("title", f"Article {i+1}") for i, a in enumerate(scraped_data)]
@@ -103,15 +101,15 @@ if output:
 
         st.markdown("#### 📄 Full Text")
         st.markdown(selected_article.get("body", "No content found."))
-
+        print(output)
         # === Relevance ===
-        rel = output.get("relevance", {}).get(str(selected_index), {})
+        rel = output.get("relevance", {})[selected_index]
         st.subheader("🔍 Relevance Check")
         st.markdown(f"**Relevant:** `{rel.get('is_relevant', False)}`")
         st.markdown(f"**Reason:** {rel.get('reason', 'No justification provided.')}`")
 
         # === Entities ===
-        entities = output.get("business_entity", {}).get(str(selected_index), [])
+        entities = output.get("business_entity", {})[selected_index]
         st.subheader("🏢 Business Entities")
         if entities:
             for entity in entities:
@@ -123,16 +121,14 @@ if output:
 
         # === Opportunity ===
         st.subheader("🚀 Collaboration Opportunity")
+        st.markdown(f"**Opportunity:** {output.get('opportunity', {})[selected_index]}")
         st.markdown(
-            f"**Opportunity:** {output.get('opportunity', {}).get(str(selected_index), 'Not available.')}"
-        )
-        st.markdown(
-            f"**Justification:** {output.get('justification', {}).get(str(selected_index), 'Not available.')}"
+            f"**Justification:** {output.get('justification', {})[selected_index]}"
         )
 
         # === Email Draft ===
         st.subheader("📧 Email Draft Generator")
-        email_map = output.get("email_draft", {}).get(str(selected_index), {})
+        email_map = output.get("email_draft", {})[selected_index]
         if email_map:
             entity_options = list(email_map.keys())
             selected_entity = st.selectbox(

@@ -1,8 +1,8 @@
 from langchain.schema import HumanMessage
 from agent.templates import RelevanceScore
+from agent.templates import GraphState
 
-
-def relevance_scoring_node(state):
+def relevance_scoring_node(state: GraphState) -> GraphState:
     """
     This node checks if the content is relevant to the query.
     If it is, it sets the state to True and continues to the next node.
@@ -45,8 +45,26 @@ The National Environment Agency (NEA) has issued a licence to Beverage Container
 
     structured_output_parser = model.with_structured_output(RelevanceScore)
     decision_response = structured_output_parser.invoke([HumanMessage(content=prompt)])
-    state["relevance"] = {
-        "is_relevant": decision_response.is_relevant,
-        "reason": decision_response.reason,
-    }
+    if state.get("relevance", None) is None:
+        state["relevance"] = []
+    state["relevance"].append(
+        {
+            "is_relevant": decision_response.is_relevant,
+            "reason": decision_response.reason,
+        }
+    )
+    return state
+
+def collect_relevant_articles(state: GraphState) -> GraphState:
+    articles = state.get("scraped_data", [])
+    relevance = state.get("relevance", [])
+    relevant_articles = [
+        a for a, r in zip(articles, relevance) if r.get("is_relevant", False)
+    ]
+    state["relevant_articles"] = relevant_articles
+    state["current_index"] = 0
+    if relevant_articles:
+        state["current_article"] = relevant_articles[0]
+    else:
+        state["current_article"] = {}
     return state
