@@ -72,8 +72,8 @@ async def fetch_links_by_listing(
 
             results.append({"title": title, "url": full_url})
 
-        await browser.close()
         await context.close()
+        await browser_instance.close()
         return results
 
 
@@ -151,8 +151,8 @@ async def extract_article_body(url: str, headless: bool, browser: str) -> str:
         except Exception as e:
             print(f"❌ Failed to extract from {url}: {e}")
         finally:
-            await browser.close()
             await context.close()
+            await browser_instance.close()
         return ""
 
 
