@@ -1,76 +1,45 @@
 from langchain.schema import HumanMessage
-from agent.templates import BusinessEntity
-from agent.templates import GraphState, NewsArticle, OpenAI
+from agent.templates import BusinessEntity, GraphState, NewsArticle, OpenAI
 
 
 def business_entity_identification(
-    model: OpenAI, article: NewsArticle
+    model: OpenAI, spice_context: str, article: NewsArticle
 ) -> BusinessEntity:
     """
-    This node identifies the business entities mentioned in the scraped data.
-    It updates the state with the identified business entities.
+    Extract the top five most relevant business entities from the article
+    for SPICE outreach, returning their name, type, and role.
     """
-
     prompt = f"""
-You are a business entity identification expert assisting SPICE (SIT-Polytechnic Innovation Centre of Excellence), a department that supports industry collaborations in applied R&D and innovation projects.
+You are a business entity identification expert for SPICE (SIT-Polytechnic Innovation Centre of Excellence).
+Extract up to **5** organizations mentioned in this article that SPICE could collaborate with.
+Relevance means the entity plays a major role (leading an initiative, receiving funding/licenses, or partnering).
+Return JSON with a single key `entities`, a list of objects each having:
+- `name`: full organization name
+- `type`: "company" or "government agency"
+- `role`: its role in the article
 
-Your task is to extract all business entities (e.g. companies, government agencies, joint ventures, or organizations) mentioned in the article below. These may include:
-- The company or agency responsible for an initiative
-- Organizations granted licenses, funding, or contracts
-- Entities collaborating on a project
-
-Respond in the following **JSON format**, where the response is an object containing an "entities" key mapped to a list of business entities.
-
-Each entity must include:
-- "name": full organization name
-- "type": "company" or "government agency"
-- "role": its role in the article context
-
-### Example Input:
-The National Environment Agency (NEA) has issued a licence to Beverage Container Return Scheme Ltd. (BCRS Ltd.) to design and operate the beverage container return scheme. BCRS Ltd. is formed by Coca-Cola Singapore Beverages Pte. Ltd., F&N Foods Pte. Ltd., and Pokka Pte. Ltd.
-
-### Example Input:
-The Urban Redevelopment Authority (URA) and GovTech have partnered with ST Engineering to launch a pilot program for smart lamp posts across downtown Singapore. These lamp posts will integrate sensors for air quality monitoring, footfall tracking, and emergency alerts. The pilot will run for 18 months starting Q3 2024, and ST Engineering will handle system integration and deployment. URA will evaluate the urban design impacts, while GovTech will provide the data backend infrastructure.
-
-### Example Output:
-{{
-  "entities": [
-    {{
-      "name": "Urban Redevelopment Authority",
-      "type": "government agency",
-      "role": "Coordinating the urban planning aspects of the pilot"
-    }},
-    {{
-      "name": "GovTech",
-      "type": "government agency",
-      "role": "Providing digital infrastructure and backend data systems"
-    }},
-    {{
-      "name": "ST Engineering",
-      "type": "company",
-      "role": "System integrator responsible for hardware and deployment"
-    }}
-  ]
-}}
+### SPICE Context:
+{spice_context}
 
 ### Article Content:
 {article.body}
 """
 
-    structured_output_parser = model.with_structured_output(BusinessEntity)
-    response = structured_output_parser.invoke([HumanMessage(content=prompt)])
-    return response.entities
+    parser = model.with_structured_output(BusinessEntity)
+    return parser.invoke([HumanMessage(content=prompt)])
 
 
 def business_entity_identification_node(state: GraphState) -> GraphState:
     """
-    Handles the business entity identification node.
-    Extracts business entities from the current article and updates the state.
+    For each article marked relevant, run the BEI prompt and keep up to 5 entities.
     """
     for article in state.get("articles", []):
-        if article.relevance.is_relevant:
-            article.business_entities = business_entity_identification(
-                state["model"], article
+        if getattr(article, "relevance", None) and article.relevance.is_relevant:
+            result: BusinessEntity = business_entity_identification(
+                state["model"], state["spice_context"], article
             )
-
+            # Truncate to top 5
+            article.business_entities = result.entities[:5]
+        else:
+            article.business_entities = []
     return state

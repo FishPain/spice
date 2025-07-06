@@ -7,6 +7,7 @@ from agent.scraping.webscrape import web_scrape_node
 from agent.identification.bei import business_entity_identification_node
 from agent.identification.opportunity import opportunity_identification_node
 from agent.outreach.email import email_outreach_node
+from agent.summary.summary import summary_node
 from agent.templates import GraphState
 
 
@@ -40,6 +41,7 @@ def build_graph():
 
     # Nodes
     workflow.add_node("web_scrape", web_scrape_node)
+    workflow.add_node("summary", summary_node)
     workflow.add_node("relevance_score", relevance_scoring_node)
     workflow.add_node("bei", business_entity_identification_node)
     workflow.add_node("opportunity_identification", opportunity_identification_node)
@@ -55,9 +57,11 @@ def build_graph():
         lambda state: len(state["articles"]) == 0,
         {
             True: "handle_no_articles",
-            False: "relevance_score",
+            False: "summary",
         },
     )
+
+    workflow.add_edge("summary", "relevance_score")
 
     workflow.add_conditional_edges(
         "relevance_score",

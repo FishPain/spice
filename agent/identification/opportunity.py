@@ -51,7 +51,7 @@ c) Matching those needs to SPICE’s domains above.
 
 Finally, **output** a JSON object matching this Pydantic schema for `Opportunity` (no extra keys):
 
-{Opportunity.model_json_schema(indent=2)}
+{Opportunity.model_json_schema()}
 
 Your JSON must be valid.  
 """
