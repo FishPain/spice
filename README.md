@@ -1,28 +1,40 @@
-# spice
-
-## What this project does
-A website that will scrape the news page of various gov agencies once a day. 
-
-The scraped content will be passed through a LLM to determine:
-•⁠  ⁠relevance (can sit spice partner with them?)
-•⁠  ⁠⁠target company (any companies that they licensed to, or is it an inter gov agency effort)
-•⁠  ⁠⁠opportunity (what are the problems identified through the article and how spice can come into play.)
-•⁠  ⁠⁠retrieve company events (if any)
-•⁠  ⁠⁠auto email drafting (auto draft cold email to be sent - requires manual sending)
-
 ## Running the project
-1. Clone the repository
-2. Install the required packages
+
+1. **Clone the repository**
+
+2. **Create and activate a Python virtual environment**
 ```bash
-# require python 3.13 or higher
+# Create a new virtual environment (you can name it .venv or anything else)
+python3.13 -m venv .venv
+
+# Activate the virtual environment
+# On macOS/Linux:
+source .venv/bin/activate
+
+# On Windows:
+.venv\Scripts\activate
+```
+
+3. **Install the required packages**
+```bash
 pip install -r requirements.txt
 ```
-3. Set up the environment variables
-```bash
-export OPENAI_API_KEY=your_api_key
+
+4. **Set up the environment variables**  
+Follow the `.env.example` file to create a `.env` file in the root directory of the project. You will need to set up the following variables:
+```dotenv
+OPENAI_API_KEY=
+LANGSMITH_TRACING=true
+LANGCHAIN_TRACING_V2=true
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_API_KEY=
+LANGSMITH_PROJECT=
 ```
-4. Run the application
+
+5. **Run the application**
 ```bash
 streamlit run app.py
 ```
-5. Open your browser and go to `http://localhost:8501`
+
+6. **Open your browser**  
+Go to: [http://localhost:8501](http://localhost:8501)
