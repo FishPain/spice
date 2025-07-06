@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import PydanticOutputParser
 
-from agent.templates import GraphState, NewsLinkList, NewsArticle
+from agent.templates import NewsLinkList, NewsArticle
 
 
 # === Utility Functions ===
@@ -27,16 +27,19 @@ def normalize_path(path: str) -> str:
 
 # === Scraping Functions ===
 async def fetch_links_by_listing(
-    listing_url: str, max_results: int
+    listing_url: str, max_results: int, headless: bool = True, browser: str = "firefox"
 ) -> List[Dict[str, str]]:
     parsed = urlparse(listing_url)
     raw_prefix = parsed.path.rstrip("/") + "/"
     norm_prefix = normalize_path(raw_prefix)
 
-    print(f"\n▶️  Listing URL: {listing_url}")
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        browser_engine = getattr(p, browser)
+        browser_instance = await browser_engine.launch(headless=headless)
+        context = await browser_instance.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
         await page.goto(listing_url, wait_until="load", timeout=30000)
         await page.wait_for_timeout(2000)
 
@@ -70,12 +73,15 @@ async def fetch_links_by_listing(
             results.append({"title": title, "url": full_url})
 
         await browser.close()
+        await context.close()
         return results
 
 
-async def fetch_all(url: str, max_results: int) -> List[Dict[str, str]]:
+async def fetch_all(
+    url: str, max_results: int, headless: bool, browser: str
+) -> List[Dict[str, str]]:
     try:
-        return await fetch_links_by_listing(url, max_results)
+        return await fetch_links_by_listing(url, max_results, headless, browser)
     except Exception as e:
         print(f"⚠️ Error on {url}: {e}")
         return []
@@ -103,9 +109,7 @@ def filter_with_llm_by_source(
 
     filtered = []
     for src, links in all_articles.items():
-        print(f"\n🔍 Filtering from source: {src} ({len(links)} links)")
         for i, batch in enumerate(chunked(links, 10)):
-            print(f"🧠 Processing chunk {i + 1}...")
             user_prompt = f"Evaluate the following list:\n{json.dumps(batch, indent=2, ensure_ascii=False)}"
             messages = [
                 SystemMessage(content=system_prompt),
@@ -122,15 +126,18 @@ def filter_with_llm_by_source(
                     filtered.append(item)
             except Exception as e:
                 print("❌ Error parsing structured output:", e)
-                print("↪ Raw response:", response.content)
     return filtered
 
 
 # === Content Extraction ===
-async def extract_article_body(url: str) -> str:
+async def extract_article_body(url: str, headless: bool, browser: str) -> str:
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        browser_engine = getattr(p, browser)
+        browser_instance = await browser_engine.launch(headless=headless)
+        context = await browser_instance.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
         try:
             await page.goto(url, wait_until="load", timeout=15000)
             await page.wait_for_timeout(1000)
@@ -145,18 +152,19 @@ async def extract_article_body(url: str) -> str:
             print(f"❌ Failed to extract from {url}: {e}")
         finally:
             await browser.close()
+            await context.close()
         return ""
 
 
 async def process_articles(
-    articles: List[Dict[str, str]],
+    articles: List[Dict[str, str]], headless: bool = True, browser: str = "firefox"
 ) -> List[NewsArticle]:
     results = []
     for i, article in enumerate(articles, 1):
         host = article["url"].host
         url = article.get("full_url", article["url"])
         title = article.get("title", f"Article {i}")
-        body = await extract_article_body(url)
+        body = await extract_article_body(url, headless, browser)
 
         article_data = {
             "host": host,
@@ -176,13 +184,15 @@ def web_scrape_node(state: dict) -> dict:
     websites = state.get("websites", {})
     selected_key = state.get("website_selected", "")
     max_results = state.get("max_results", 10)
+    headless = state.get("headless", True)
+    browser = state.get("browser", "firefox")
     listing_url = websites[selected_key]
 
     model = state.get("model", ChatOpenAI(model="gpt-4o-mini", temperature=0))
     scraped_articles = state.get("scraped_articles", {})
 
     # Scrape fresh data
-    all_articles = asyncio.run(fetch_all(listing_url, max_results))
+    all_articles = asyncio.run(fetch_all(listing_url, max_results, headless, browser))
     new_articles_only, new_data_found = {}, False
 
     if listing_url in scraped_articles:
@@ -202,11 +212,9 @@ def web_scrape_node(state: dict) -> dict:
 
     if new_data_found:
         filtered_articles = filter_with_llm_by_source(model, new_articles_only)
-        print(f"\n📑 Filtered down to {len(filtered_articles)} valid articles.")
-        extracted = asyncio.run(process_articles(filtered_articles))
+        extracted = asyncio.run(process_articles(filtered_articles, headless, browser))
         state["articles"] = extracted
     else:
-        print("ℹ️ No new articles found since last scrape.")
         state["articles"] = []
 
     return state

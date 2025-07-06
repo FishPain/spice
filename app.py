@@ -6,61 +6,97 @@ from agent.context.spice import SPICE_CONTEXT
 import json
 from pathlib import Path
 
-# Load .env
+# === Load environment ===
 load_dotenv()
 
-# === Configuration ===
-websites = {
+# === Default configuration ===
+DEFAULT_WEBSITES = {
     "NEA": "https://www.nea.gov.sg/media/news",
     "PUB": "https://www.pub.gov.sg/Resources/News-Room/PressReleases",
     "BCA": "https://www1.bca.gov.sg/about-us/news-and-publications/media-releases",
     "IMDA": "https://www.imda.gov.sg/resources/press-releases-factsheets-and-speeches",
 }
 
-st.set_page_config(page_title="SPICE Automated Outreach System", layout="wide")
+# === Session State Init ===
+st.set_page_config(page_title="SPICE Outreach System", layout="wide")
 st.title("📡 SPICE Automated Outreach System")
 
-# === Session State ===
+if "websites" not in st.session_state:
+    st.session_state.websites = DEFAULT_WEBSITES.copy()
 if "output" not in st.session_state:
     st.session_state.output = None
 if "selected_article_index" not in st.session_state:
     st.session_state.selected_article_index = 0
 
-left_col, right_col = st.columns([1, 1])
+# === Sidebar Controls ===
+with st.sidebar:
+    st.header("⚙️ Scraper Configuration")
 
-# === Left Column: Input Panel ===
-with left_col:
-    st.markdown("### 🏛️ Select a Government Agency")
-    agency = st.selectbox(
-        "Agency", options=websites.keys(), index=0, label_visibility="collapsed"
-    )
+    # Agency selection
+    agency = st.selectbox("🏛️ Select Agency", list(st.session_state.websites.keys()))
 
-    if st.button("🚀 Run Analysis"):
-        with st.spinner("🔍 Analyzing article(s)... please wait"):
-            scraped_articles_path = Path("all_articles.json")
-            scraped_articles = (
-                json.loads(scraped_articles_path.read_text(encoding="utf-8"))
-                if scraped_articles_path.exists()
-                else {}
-            )
+    # Add new agency
+    st.markdown("---")
+    st.markdown("➕ **Add a New Agency**")
+    with st.form("add_agency_form", clear_on_submit=True):
+        new_agency_name = st.text_input("Agency Name")
+        new_agency_url = st.text_input("Agency News URL")
+        submitted = st.form_submit_button("Add")
 
-            model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-            graph = build_graph().compile()
+        if submitted:
+            if not new_agency_name or not new_agency_url:
+                st.warning("Please provide both name and URL.")
+            elif not new_agency_url.startswith("http"):
+                st.warning("URL must start with http or https.")
+            elif new_agency_name in st.session_state.websites:
+                st.warning("This agency already exists.")
+            else:
+                st.session_state.websites[new_agency_name] = new_agency_url
+                st.success(f"✅ Added {new_agency_name}")
+                agency = new_agency_name  # refresh
 
-            # try:
+    st.markdown("---")
+    # Scraper settings
+    st.markdown("🧪 **Browser Settings**")
+    browser_choice = st.selectbox("Browser", ["firefox", "chromium", "webkit"])
+    st.session_state.browser = browser_choice
+
+    headless = st.checkbox("Headless Mode", value=True)
+    st.session_state.headless = headless
+
+    run_analysis = st.button("🔍 Run Scraper & Analyze Articles")
+
+# === Run Analysis Button ===
+st.markdown("## 🚀 Run Scraper & Analyze Articles")
+if run_analysis:
+    with st.spinner("Fetching and analyzing articles..."):
+        scraped_path = Path("all_articles.json")
+        scraped_articles = (
+            json.loads(scraped_path.read_text(encoding="utf-8"))
+            if scraped_path.exists()
+            else {}
+        )
+
+        model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        graph = build_graph().compile()
+
+        try:
             inputs = {
                 "model": model,
                 "spice_context": SPICE_CONTEXT,
-                "websites": websites,
+                "websites": st.session_state.websites,
                 "website_selected": agency,
                 "max_results": 10,
                 "scraped_articles": scraped_articles,
+                "headless": st.session_state.headless,
+                "browser": st.session_state.browser,
             }
+
             result = graph.invoke(inputs)
             st.session_state.output = result
 
-            # Save merged articles
-            scraped_articles_path.write_text(
+            # Save updated article state
+            scraped_path.write_text(
                 json.dumps(
                     result.get("scraped_articles", scraped_articles),
                     indent=2,
@@ -69,68 +105,65 @@ with left_col:
                 encoding="utf-8",
             )
 
-            if not result.get("articles"):
-                st.warning("No new articles were found from this agency.")
-            else:
-                st.success("✅ Analysis complete!")
+            articles = result.get("articles", [])
+            if articles:
+                st.success(f"✅ Found {len(articles)} relevant article(s).")
+                st.session_state.selected_article_index = 0
 
-            st.session_state.selected_article_index = 0
+        except Exception as e:
+            st.error(f"❌ Error during analysis:\n\n`{e}`")
 
-            # except Exception as e:
-            #     st.error(f"❌ An error occurred during analysis: {e}")
-
-# === Right Column: Results Panel ===
+# === Article Viewer ===
 output = st.session_state.output
 if output:
     articles = output.get("articles", [])
     if articles:
-        st.markdown("### 📑 Select and Review Articles")
-
-        titles = [article.title for article in articles]
+        st.markdown("## 📄 Article Review Panel")
         selected_index = st.selectbox(
-            "Select Article",
-            options=range(len(titles)),
-            format_func=lambda i: titles[i],
+            "🗂️ Select Article",
+            options=range(len(articles)),
+            format_func=lambda i: f"{i + 1}. {articles[i].title}",
         )
+        article = articles[selected_index]
 
-        selected_article = articles[selected_index]
+        # === Article Content
+        st.markdown("### 📰 Article Details")
+        st.markdown(f"**🧾 Title:** {article.title}")
+        st.markdown(
+            f"**🔗 URL:** [View Original]({article.url})", unsafe_allow_html=True
+        )
+        st.markdown("**📃 Content:**")
+        st.write(article.body)
 
-        # === Article Metadata ===
-        st.subheader("📰 Article Information")
-        st.markdown(f"**Title:** {selected_article.title}")
-        st.markdown(f"[🔗 View Full Article]({selected_article.url})")
+        # === Relevance
+        st.markdown("### 🧠 Relevance Assessment")
+        st.markdown(f"- **Relevant:** `{article.relevance.is_relevant}`")
+        st.markdown(f"- **Reason:** {article.relevance.reason}")
 
-        st.markdown("#### 📄 Full Text")
-        st.markdown(selected_article.body)
-
-        # === Relevance ===
-        rel = selected_article.relevance
-        st.subheader("🔍 Relevance Check")
-        st.markdown(f"**Relevant:** `{rel.is_relevant}`")
-        st.markdown(f"**Reason:** {rel.reason}`")
-
-        # === Entities ===
-        entities = selected_article.business_entities
-        st.subheader("🏢 Business Entities")
-        if entities:
-            for entity in entities:
-                st.markdown(f"- **{entity.name}** ({entity.type}): {entity.role}")
+        # === Business Entities
+        st.markdown("### 🏢 Detected Business Entities")
+        if article.business_entities:
+            for e in article.business_entities:
+                st.markdown(f"- **{e.name}** ({e.type}) — _{e.role}_")
         else:
-            st.info("No business entities identified.")
+            st.info("No entities found.")
 
-        # === Opportunity ===
-        st.subheader("🚀 Collaboration Opportunity")
-        st.markdown(f"**Opportunity:** {selected_article.opportunity.opportunity}")
-        st.markdown(f"**Justification:** {selected_article.opportunity.justification}")
+        # === Opportunity
+        st.markdown("### 🚀 Collaboration Opportunity")
+        if article.opportunity:
+            st.markdown(f"**Opportunity:** {article.opportunity.opportunity}")
+            st.markdown(f"**Justification:** {article.opportunity.justification}")
+        else:
+            st.info("No opportunity identified.")
 
-        # === Email Draft ===
-        st.subheader("📧 Email Draft Generator")
-        email_map = selected_article.email_drafts
-        if email_map:
-            entity_options = list(email_map.keys())
+        # === Email Draft
+        st.markdown("### 📧 Outreach Email Draft")
+        if article.email_drafts:
             selected_entity = st.selectbox(
-                "Select Business Entity for Email", entity_options
+                "Choose Entity", list(article.email_drafts.keys())
             )
-            st.code(email_map[selected_entity], language="markdown")
+            st.code(article.email_drafts[selected_entity], language="markdown")
         else:
-            st.info("No email drafts available.")
+            st.info("No draft available.")
+    else:
+        st.warning("⚠️ No relevant articles available.")

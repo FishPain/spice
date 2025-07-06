@@ -90,7 +90,7 @@ class NewsArticle(BaseModel):
     relevance: RelevanceScore = None
     business_entities: List[BusinessEntityItem] = []
     opportunity: Opportunity = None
-    email_drafts: List[str] = None
+    email_drafts: List[dict[str, str]] = None
 
 
 class GraphState(TypedDict):
@@ -104,3 +104,5 @@ class GraphState(TypedDict):
     current_article: Optional[NewsArticle]
     scraped_articles: dict
     response: Optional[object]
+    headless: bool
+    browser: Literal["chromium", "firefox", "webkit"]
