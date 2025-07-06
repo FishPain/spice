@@ -69,7 +69,7 @@ with left_col:
                 encoding="utf-8",
             )
 
-            if not result.get("scraped_data"):
+            if not result.get("articles"):
                 st.warning("No new articles were found from this agency.")
             else:
                 st.success("✅ Analysis complete!")
@@ -82,53 +82,50 @@ with left_col:
 # === Right Column: Results Panel ===
 output = st.session_state.output
 if output:
-    scraped_data = output.get("scraped_data", [])
-    if scraped_data:
+    articles = output.get("articles", [])
+    if articles:
         st.markdown("### 📑 Select and Review Articles")
 
-        titles = [a.get("title", f"Article {i+1}") for i, a in enumerate(scraped_data)]
+        titles = [article.title for article in articles]
         selected_index = st.selectbox(
             "Select Article",
             options=range(len(titles)),
             format_func=lambda i: titles[i],
         )
-        selected_article = scraped_data[selected_index]
+
+        selected_article = articles[selected_index]
 
         # === Article Metadata ===
         st.subheader("📰 Article Information")
-        st.markdown(f"**Title:** {selected_article.get('title', 'N/A')}")
-        st.markdown(f"[🔗 View Full Article]({selected_article.get('url', '#')})")
+        st.markdown(f"**Title:** {selected_article.title}")
+        st.markdown(f"[🔗 View Full Article]({selected_article.url})")
 
         st.markdown("#### 📄 Full Text")
-        st.markdown(selected_article.get("body", "No content found."))
-        print(output)
+        st.markdown(selected_article.body)
+
         # === Relevance ===
-        rel = output.get("relevance", {})[selected_index]
+        rel = selected_article.relevance
         st.subheader("🔍 Relevance Check")
-        st.markdown(f"**Relevant:** `{rel.get('is_relevant', False)}`")
-        st.markdown(f"**Reason:** {rel.get('reason', 'No justification provided.')}`")
+        st.markdown(f"**Relevant:** `{rel.is_relevant}`")
+        st.markdown(f"**Reason:** {rel.reason}`")
 
         # === Entities ===
-        entities = output.get("business_entity", {})[selected_index]
+        entities = selected_article.business_entities
         st.subheader("🏢 Business Entities")
         if entities:
             for entity in entities:
-                st.markdown(
-                    f"- **{entity['name']}** ({entity['type']}): {entity['role']}"
-                )
+                st.markdown(f"- **{entity.name}** ({entity.type}): {entity.role}")
         else:
             st.info("No business entities identified.")
 
         # === Opportunity ===
         st.subheader("🚀 Collaboration Opportunity")
-        st.markdown(f"**Opportunity:** {output.get('opportunity', {})[selected_index]}")
-        st.markdown(
-            f"**Justification:** {output.get('justification', {})[selected_index]}"
-        )
+        st.markdown(f"**Opportunity:** {selected_article.opportunity.opportunity}")
+        st.markdown(f"**Justification:** {selected_article.opportunity.justification}")
 
         # === Email Draft ===
         st.subheader("📧 Email Draft Generator")
-        email_map = output.get("email_draft", {})[selected_index]
+        email_map = selected_article.email_drafts
         if email_map:
             entity_options = list(email_map.keys())
             selected_entity = st.selectbox(

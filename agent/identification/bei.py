@@ -1,14 +1,15 @@
 from langchain.schema import HumanMessage
 from agent.templates import BusinessEntity
+from agent.templates import GraphState, NewsArticle, OpenAI
 
 
-def business_entity_identification_node(state: dict) -> dict:
+def business_entity_identification(
+    model: OpenAI, article: NewsArticle
+) -> BusinessEntity:
     """
     This node identifies the business entities mentioned in the scraped data.
     It updates the state with the identified business entities.
     """
-    scraped_data = state.get("current_article", {}).get("body", "")
-    model = state["model"]
 
     prompt = f"""
 You are a business entity identification expert assisting SPICE (SIT-Polytechnic Innovation Centre of Excellence), a department that supports industry collaborations in applied R&D and innovation projects.
@@ -53,13 +54,23 @@ The Urban Redevelopment Authority (URA) and GovTech have partnered with ST Engin
 }}
 
 ### Article Content:
-{scraped_data}
+{article.body}
 """
 
     structured_output_parser = model.with_structured_output(BusinessEntity)
     response = structured_output_parser.invoke([HumanMessage(content=prompt)])
-    if state.get("business_entity", None) is None:
-        state["business_entity"] = []
+    return response.entities
 
-    state["business_entity"].append(response.entities)
+
+def business_entity_identification_node(state: GraphState) -> GraphState:
+    """
+    Handles the business entity identification node.
+    Extracts business entities from the current article and updates the state.
+    """
+    for article in state.get("articles", []):
+        if article.relevance.is_relevant:
+            article.business_entities = business_entity_identification(
+                state["model"], article
+            )
+
     return state

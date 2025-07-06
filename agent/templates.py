@@ -2,24 +2,9 @@ from typing import List, Literal
 from pydantic import BaseModel, Field, HttpUrl
 from typing_extensions import TypedDict
 
-
-class GraphState(TypedDict):
-    model: object
-    websites: List[str]  # List of websites to scrape
-    website_selected: str  # Key of the selected website from the list
-    max_results: int  # Maximum number of articles to scrape from the selected website
-    spice_context: str
-    scraped_data: List[dict]  # List of articles from web_scrape
-    scraped_articles: dict  # Dictionary of articles scraped from various websites
-    current_index: int  # Index of the current article
-    current_article: dict  # Current article being processed
-    aggregated_results: List[dict]  # Stores relevance/entity/opportunity per article
-    relevance: List[dict]
-    business_entity: List[dict]
-    opportunity: str
-    justification: str
-    email_draft: str
-    feedback: str
+from langchain_openai import OpenAI
+from typing import List, Literal, Optional
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class NewsLink(BaseModel):
@@ -76,3 +61,46 @@ class Opportunity(BaseModel):
         ...,
         description="The justification for the identified opportunity.",
     )
+
+
+class EmailDraft(BaseModel):
+    """
+    Represents a draft email for outreach.
+    """
+
+    subject: str = Field(
+        ...,
+        description="The subject of the email.",
+    )
+    body: str = Field(
+        ...,
+        description="The body content of the email.",
+    )
+    recipient: str = Field(
+        ...,
+        description="The recipient of the email.",
+    )
+
+
+class NewsArticle(BaseModel):
+    host: str
+    title: str
+    url: str
+    body: Optional[str] = None
+    relevance: RelevanceScore = None
+    business_entities: List[BusinessEntityItem] = []
+    opportunity: Opportunity = None
+    email_draft: List[str] = None
+
+
+class GraphState(TypedDict):
+    model: OpenAI
+    spice_context: str
+    websites: dict
+    website_selected: str
+    max_results: int
+    articles: List[NewsArticle]
+    current_index: int
+    current_article: Optional[NewsArticle]
+    scraped_articles: dict
+    response: Optional[object]

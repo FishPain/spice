@@ -1,16 +1,16 @@
 from langchain.schema import HumanMessage
 from agent.templates import RelevanceScore
-from agent.templates import GraphState
+from agent.templates import GraphState, NewsArticle
 
-def relevance_scoring_node(state: GraphState) -> GraphState:
+
+def relevance_scoring(
+    model: object, spice_context: str, article: NewsArticle
+) -> RelevanceScore:
     """
     This node checks if the content is relevant to the query.
     If it is, it sets the state to True and continues to the next node.
     If not, it sets the state to False and goes to the out_of_scope node.
     """
-    model = state["model"]
-    spice_context = state["spice_context"]
-    scraped_data = state["current_article"].get("body")
     prompt = f"""
 You are an expert relevance evaluator working for SPICE (SIT-Polytechnic Innovation Centre of Excellence), a department that supports industry collaborations in applied R&D and innovation projects.
 
@@ -40,31 +40,23 @@ The National Environment Agency (NEA) has issued a licence to Beverage Container
 {spice_context}
 
 ### Article Content:
-{scraped_data}
+{article.body}
 """
 
     structured_output_parser = model.with_structured_output(RelevanceScore)
     decision_response = structured_output_parser.invoke([HumanMessage(content=prompt)])
-    if state.get("relevance", None) is None:
-        state["relevance"] = []
-    state["relevance"].append(
-        {
-            "is_relevant": decision_response.is_relevant,
-            "reason": decision_response.reason,
-        }
-    )
-    return state
+    return decision_response
 
-def collect_relevant_articles(state: GraphState) -> GraphState:
-    articles = state.get("scraped_data", [])
-    relevance = state.get("relevance", [])
-    relevant_articles = [
-        a for a, r in zip(articles, relevance) if r.get("is_relevant", False)
-    ]
-    state["relevant_articles"] = relevant_articles
-    state["current_index"] = 0
-    if relevant_articles:
-        state["current_article"] = relevant_articles[0]
-    else:
-        state["current_article"] = {}
+
+def relevance_scoring_node(state: GraphState) -> GraphState:
+    """
+    Handles the relevance scoring node.
+    If the article is relevant, it continues to the next node.
+    If not, it goes to the out_of_scope node.
+    """
+    articles = state.get("articles", [])
+    for article in articles:
+        article.relevance = relevance_scoring(
+            state["model"], state["spice_context"], article
+        )
     return state

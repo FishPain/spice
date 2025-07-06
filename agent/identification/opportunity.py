@@ -1,14 +1,14 @@
 from langchain.schema import HumanMessage
 from agent.templates import Opportunity
+from agent.templates import GraphState, NewsArticle, OpenAI
 
 
-def opportunity_identification_node(state):
+def opportunity_identification(
+    model: OpenAI, spice_context: str, article: NewsArticle
+) -> Opportunity:
     """
     This node identifies opportunities for SPICE to collaborate with the business entity mentioned in the article.
     """
-    model = state["model"]
-    spice_context = state["spice_context"]
-    scraped_data = state["current_article"].get("body")
 
     prompt = f"""
 You are an innovation opportunity analyst working for SPICE (SIT-Polytechnic Innovation Centre of Excellence), a department that supports applied R&D, prototyping, and industry partnerships with local companies and agencies.
@@ -44,14 +44,22 @@ Response:
 {spice_context}
 
 ### Article Content:
-{scraped_data}
+{article.body}
 """
+
     structured_output_parser = model.with_structured_output(Opportunity)
     decision_response = structured_output_parser.invoke([HumanMessage(content=prompt)])
-    if state.get("opportunity", None) is None:
-        state["opportunity"] = []
-    state["opportunity"].append(decision_response.opportunity)
-    if state.get("justification", None) is None:
-        state["justification"] = []
-    state["justification"].append(decision_response.justification)
+    return decision_response
+
+
+def opportunity_identification_node(state: GraphState) -> GraphState:
+    """
+    Handles the opportunity identification node.
+    Extracts opportunities from the current article and updates the state.
+    """
+    for article in state.get("articles", []):
+        if article.relevance.is_relevant:
+            article.opportunity = opportunity_identification(
+                state["model"], state["spice_context"], article
+            )
     return state

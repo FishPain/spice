@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import PydanticOutputParser
 
-from agent.templates import GraphState, NewsLinkList
+from agent.templates import GraphState, NewsLinkList, NewsArticle
 
 
 # === Utility Functions ===
@@ -148,17 +148,26 @@ async def extract_article_body(url: str) -> str:
         return ""
 
 
-async def process_and_print_articles(
+async def process_articles(
     articles: List[Dict[str, str]],
-) -> List[Dict[str, str]]:
+) -> List[NewsArticle]:
     results = []
     for i, article in enumerate(articles, 1):
         host = article["url"].host
         url = article.get("full_url", article["url"])
         title = article.get("title", f"Article {i}")
-        print(f"\n🔗 [{i}] Fetching article content from: {url}")
         body = await extract_article_body(url)
-        results.append({"host": host, "url": url, "body": body, "title": title})
+
+        article_data = {
+            "host": host,
+            "title": title,
+            "url": url,
+            "body": body,
+        }
+
+        news_article = NewsArticle(**article_data)
+        results.append(news_article)
+
     return results
 
 
@@ -168,12 +177,14 @@ def web_scrape_node(state: dict) -> dict:
     selected_key = state.get("website_selected", "")
     max_results = state.get("max_results", 10)
     listing_url = websites[selected_key]
+
     model = state.get("model", ChatOpenAI(model="gpt-4o-mini", temperature=0))
     scraped_articles = state.get("scraped_articles", {})
 
     # Scrape fresh data
     all_articles = asyncio.run(fetch_all(listing_url, max_results))
     new_articles_only, new_data_found = {}, False
+
     if listing_url in scraped_articles:
         seen = {json.dumps(x, sort_keys=True) for x in scraped_articles[listing_url]}
         new_articles = [
@@ -192,27 +203,10 @@ def web_scrape_node(state: dict) -> dict:
     if new_data_found:
         filtered_articles = filter_with_llm_by_source(model, new_articles_only)
         print(f"\n📑 Filtered down to {len(filtered_articles)} valid articles.")
-        extracted = asyncio.run(process_and_print_articles(filtered_articles))
-        state["scraped_data"] = extracted
+        extracted = asyncio.run(process_articles(filtered_articles))
+        state["articles"] = extracted
     else:
         print("ℹ️ No new articles found since last scrape.")
-        state["scraped_data"] = []
+        state["articles"] = []
 
-    return state
-
-
-def web_scrape_handler_node(state: GraphState) -> GraphState:
-    result = web_scrape_node(state)
-    scraped_data = result.get("scraped_data", [])
-
-    if not scraped_data:
-        print("📭 No new data found. Ending graph early.")
-        state["scraped_data"] = []
-        state["end_reason"] = "no_data"
-        return state
-
-    state["scraped_data"] = scraped_data
-    state["current_index"] = 0
-    state["aggregated_results"] = []
-    state["current_article"] = scraped_data[0]
     return state
