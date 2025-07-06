@@ -10,8 +10,7 @@ def relevance_scoring_node(state):
     """
     model = state["model"]
     spice_context = state["spice_context"]
-    scraped_data = state["scraped_data"].get("body")
-
+    scraped_data = state["current_article"].get("body")
     prompt = f"""
 You are an expert relevance evaluator working for SPICE (SIT-Polytechnic Innovation Centre of Excellence), a department that supports industry collaborations in applied R&D and innovation projects.
 

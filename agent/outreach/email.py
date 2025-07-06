@@ -7,7 +7,7 @@ def email_outreach_node(state: dict) -> dict:
     Updates `email_draft` as a dict mapping entity name -> email text.
     """
     model = state["model"]
-    scraped_data = state["scraped_data"].get("body", "")
+    scraped_data = state["current_article"].get("body", "")
     business_entities = state["business_entity"]
     opportunity = state["opportunity"]
     justification = state["justification"]

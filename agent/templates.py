@@ -1,5 +1,34 @@
 from typing import List, Literal
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field, HttpUrl
+from typing_extensions import TypedDict
+
+
+class GraphState(TypedDict):
+    model: object
+    websites: List[str]  # List of websites to scrape
+    website_selected: str  # Key of the selected website from the list
+    max_results: int  # Maximum number of articles to scrape from the selected website
+    spice_context: str
+    scraped_data: List[dict]  # List of articles from web_scrape
+    scraped_articles: dict  # Dictionary of articles scraped from various websites
+    current_index: int  # Index of the current article
+    current_article: dict  # Current article being processed
+    aggregated_results: List[dict]  # Stores relevance/entity/opportunity per article
+    relevance: dict
+    business_entity: List[dict]
+    opportunity: str
+    justification: str
+    email_draft: str
+    feedback: str
+
+
+class NewsLink(BaseModel):
+    title: str
+    url: HttpUrl
+
+
+class NewsLinkList(BaseModel):
+    links: List[NewsLink]
 
 
 class RelevanceScore(BaseModel):

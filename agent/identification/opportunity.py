@@ -8,7 +8,7 @@ def opportunity_identification_node(state):
     """
     model = state["model"]
     spice_context = state["spice_context"]
-    scraped_data = state["scraped_data"].get("body")
+    scraped_data = state["current_article"].get("body")
 
     prompt = f"""
 You are an innovation opportunity analyst working for SPICE (SIT-Polytechnic Innovation Centre of Excellence), a department that supports applied R&D, prototyping, and industry partnerships with local companies and agencies.

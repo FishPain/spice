@@ -7,7 +7,7 @@ def business_entity_identification_node(state: dict) -> dict:
     This node identifies the business entities mentioned in the scraped data.
     It updates the state with the identified business entities.
     """
-    scraped_data = state.get("scraped_data", {}).get("body", "")
+    scraped_data = state.get("current_article", {}).get("body", "")
     model = state["model"]
 
     prompt = f"""
