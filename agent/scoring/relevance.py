@@ -1,10 +1,10 @@
 from langchain.schema import HumanMessage
 from agent.templates import RelevanceScore
-from agent.templates import GraphState, NewsArticle
+from agent.templates import GraphState, NewsArticle, OpenAI
 
 
 def relevance_scoring(
-    model: object, spice_context: str, article: NewsArticle
+    model: OpenAI, spice_context: str, article: NewsArticle
 ) -> RelevanceScore:
     """
     This node checks if the content is relevant to the query.
@@ -20,21 +20,13 @@ Use the provided context about SPICE to assess:
 - Is there a potential opportunity for SPICE to collaborate with the company or agency mentioned?
 - Does the article describe any problems, initiatives, or projects that align with SPICE's technical capabilities or research interests?
 
-Respond in the following JSON format:
+Based on SPICE’s mission and domain expertise, decide:
 
-{{
-  "is_relevant": true or false,
-  "reason": "A brief explanation for your decision"
-}}
+1. **is_relevant**: true/false — should SPICE reach out?
+2. **reason**: a short justification.
+3. **relevant_domains**: pick from SPICE’s domains.  
 
-### Example Input:
-The National Environment Agency (NEA) has issued a licence to Beverage Container Return Scheme Ltd. (BCRS Ltd.) to design and operate a nationwide recycling scheme. The scheme will collect plastic and metal beverage containers using reverse vending machines. BCRS Ltd. is formed by Coca-Cola, F&N, and Pokka.
-
-### Example Output:
-{{
-  "is_relevant": true,
-  "reason": "The article discusses a large-scale recycling initiative involving beverage companies and smart return systems, which aligns with SPICE’s capabilities in IoT, systems design, and sustainability innovation. There is a clear opportunity for collaboration in system prototyping and process optimization."
-}}
+Return valid JSON matching the Pydantic model schema.
 
 ### SPICE Context:
 {spice_context}

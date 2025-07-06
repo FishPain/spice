@@ -5,6 +5,8 @@ from typing_extensions import TypedDict
 from langchain_openai import OpenAI
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, HttpUrl
+from agent.context.spice import SPECIALIZED_CONTEXTS
+from enum import Enum
 
 
 class NewsLink(BaseModel):
@@ -17,17 +19,14 @@ class NewsLinkList(BaseModel):
 
 
 class RelevanceScore(BaseModel):
-    """
-    Represents the relevance score of a document.
-    """
-
-    is_relevant: bool = Field(
-        ...,
-        description="Whether the document is relevant to the query.",
-    )
-    reason: str = Field(
-        ...,
-        description="A brief explanation for the relevance score.",
+    is_relevant: bool = Field(..., description="Whether the article is relevant.")
+    reason: str = Field(..., description="Brief explanation for your decision.")
+    relevant_domains: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Which of SPICE’s domains apply to this article? "
+            "Choose zero or more from: " + ", ".join(SPECIALIZED_CONTEXTS.keys())
+        ),
     )
 
 
