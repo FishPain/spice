@@ -4,10 +4,59 @@ from langchain_openai import ChatOpenAI
 from agent.agent import build_graph
 from agent.context.spice import SPICE_CONTEXT
 import json
+import os
 from pathlib import Path
 
 # === Load environment ===
 load_dotenv()
+
+
+# === Authentication ===
+def check_password():
+    """Returns `True` if the user had the correct password."""
+
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        app_password = os.getenv("APP_PASSWORD")
+
+        # If no password is set in env, allow access
+        if not app_password:
+            st.session_state["authenticated"] = True
+            st.warning("⚠️ No APP_PASSWORD set in environment. Authentication disabled.")
+            return
+
+        if st.session_state["password"] == app_password:
+            st.session_state["authenticated"] = True
+            del st.session_state["password"]  # Don't store password
+        else:
+            st.session_state["authenticated"] = False
+
+    # First run - show login form
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+
+    # Show login form if not authenticated
+    if not st.session_state["authenticated"]:
+        st.markdown("# 🔐 Login Required")
+        st.markdown("Please enter your password to access the SPICE Outreach System.")
+
+        with st.form("login_form"):
+            st.text_input("Password", type="password", key="password")
+            submitted = st.form_submit_button("Login")
+
+            if submitted:
+                password_entered()
+
+        if (
+            st.session_state.get("authenticated") == False
+            and "password" not in st.session_state
+        ):
+            st.error("😕 Password incorrect")
+
+        return False
+
+    return True
+
 
 # === Default configuration ===
 DEFAULT_WEBSITES = {
@@ -19,6 +68,11 @@ DEFAULT_WEBSITES = {
 
 # === Session State Init ===
 st.set_page_config(page_title="SPICE Outreach System", layout="wide")
+
+# Check authentication before showing app
+if not check_password():
+    st.stop()  # Don't continue if not authenticated
+
 st.title("📡 SPICE Automated Outreach System")
 
 if "websites" not in st.session_state:
@@ -31,6 +85,13 @@ if "selected_article_index" not in st.session_state:
 # === Sidebar Controls ===
 with st.sidebar:
     st.header("⚙️ Scraper Configuration")
+
+    # Logout button at the top
+    if st.button("🚪 Logout"):
+        st.session_state["authenticated"] = False
+        st.rerun()
+
+    st.markdown("---")
 
     # Agency selection
     agency = st.selectbox("🏛️ Select Agency", list(st.session_state.websites.keys()))

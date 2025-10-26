@@ -24,12 +24,15 @@ pip install -r requirements.txt
 Follow the `.env.example` file to create a `.env` file in the root directory of the project. You will need to set up the following variables:
 ```dotenv
 OPENAI_API_KEY=
+APP_PASSWORD=your_secure_password_here  # Optional: Set to enable login protection
 LANGSMITH_TRACING=true
 LANGCHAIN_TRACING_V2=true
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 LANGSMITH_API_KEY=
 LANGSMITH_PROJECT=
 ```
+
+**Note:** If you set `APP_PASSWORD`, the app will require authentication. Leave it empty to disable the login page.
 
 5. **Run the application**
 ```bash
