@@ -1,5 +1,9 @@
+import logging
 from langchain_core.messages import HumanMessage
 from agent.templates import GraphState, OpenAI
+
+# Set up logger for this module
+logger = logging.getLogger("spice.summary")
 
 
 def summary(
@@ -44,12 +48,26 @@ def summary_node(state: GraphState) -> GraphState:
     Runs through each article in state["articles"] and attaches a
     focused summary at article.summary, without dropping the full body.
     """
+    logger.info("=" * 80)
+    logger.info("SUMMARY NODE STARTED")
+    logger.info("=" * 80)
+    
     articles = state.get("articles", [])
     if not articles:
+        logger.warning("No articles to summarize")
         state["response"] = "No articles to summarize."
         return state
 
-    for article in articles:
-        article.body = summary(state["model"], state["spice_context"], article)
+    logger.info(f"Summarizing {len(articles)} articles")
+    
+    for i, article in enumerate(articles, 1):
+        logger.info(f"[{i}/{len(articles)}] Summarizing: {article.title[:60]}...")
+        try:
+            article.body = summary(state["model"], state["spice_context"], article)
+            logger.debug(f"[{i}/{len(articles)}] Summary length: {len(article.body)} chars")
+        except Exception as e:
+            logger.error(f"[{i}/{len(articles)}] Error summarizing article: {e}", exc_info=True)
 
+    logger.info("✓ Summary node completed")
+    logger.info("=" * 80)
     return state

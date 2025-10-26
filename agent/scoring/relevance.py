@@ -1,6 +1,10 @@
+import logging
 from langchain_core.messages import HumanMessage
 from agent.templates import RelevanceScore
 from agent.templates import GraphState, NewsArticle, OpenAI
+
+# Set up logger for this module
+logger = logging.getLogger("spice.relevance")
 
 
 def relevance_scoring(
@@ -46,9 +50,28 @@ def relevance_scoring_node(state: GraphState) -> GraphState:
     If the article is relevant, it continues to the next node.
     If not, it goes to the out_of_scope node.
     """
+    logger.info("=" * 80)
+    logger.info("RELEVANCE SCORING NODE STARTED")
+    logger.info("=" * 80)
+    
     articles = state.get("articles", [])
-    for article in articles:
-        article.relevance = relevance_scoring(
-            state["model"], state["spice_context"], article
-        )
+    logger.info(f"Scoring relevance for {len(articles)} articles")
+    
+    relevant_count = 0
+    for i, article in enumerate(articles, 1):
+        logger.info(f"[{i}/{len(articles)}] Scoring: {article.title[:60]}...")
+        try:
+            article.relevance = relevance_scoring(
+                state["model"], state["spice_context"], article
+            )
+            if article.relevance.is_relevant:
+                relevant_count += 1
+                logger.info(f"[{i}/{len(articles)}] ✓ RELEVANT - {article.relevance.reason}")
+            else:
+                logger.info(f"[{i}/{len(articles)}] ✗ NOT RELEVANT - {article.relevance.reason}")
+        except Exception as e:
+            logger.error(f"[{i}/{len(articles)}] Error scoring relevance: {e}", exc_info=True)
+    
+    logger.info(f"✓ Relevance scoring completed: {relevant_count}/{len(articles)} relevant")
+    logger.info("=" * 80)
     return state

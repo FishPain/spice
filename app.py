@@ -191,6 +191,89 @@ if "output" not in st.session_state:
     st.session_state.output = None
 if "selected_article_index" not in st.session_state:
     st.session_state.selected_article_index = 0
+if "analysis_history" not in st.session_state:
+    st.session_state.analysis_history = []
+
+
+# === Helper Functions ===
+def load_analysis_history():
+    """Load analysis history from file."""
+    history_path = Path("analysis_history.json")
+    if history_path.exists():
+        try:
+            with open(history_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading analysis history: {e}")
+    return []
+
+
+def save_analysis_history(history):
+    """Save analysis history to file."""
+    history_path = Path("analysis_history.json")
+    try:
+        with open(history_path, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2, ensure_ascii=False, default=str)
+        logger.info(f"Saved analysis history with {len(history)} entries")
+    except Exception as e:
+        logger.error(f"Error saving analysis history: {e}")
+
+
+def add_to_history(result, agency, browser, headless):
+    """Add current analysis result to history."""
+    history_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "agency": agency,
+        "browser": browser,
+        "headless": headless,
+        "articles_count": len(result.get("articles", [])),
+        "relevant_count": sum(
+            1 for a in result.get("articles", []) if a.relevance.is_relevant
+        ),
+        "articles": [
+            {
+                "title": a.title,
+                "url": a.url,
+                "host": a.host,
+                "body": a.body,
+                "relevance": {
+                    "is_relevant": a.relevance.is_relevant,
+                    "reason": a.relevance.reason,
+                },
+                "business_entities": [
+                    {"name": e.name, "type": e.type, "role": e.role}
+                    for e in (a.business_entities or [])
+                ],
+                "opportunity": (
+                    {
+                        "opportunity": a.opportunity.opportunity,
+                        "justification": a.opportunity.justification,
+                    }
+                    if a.opportunity
+                    else None
+                ),
+                "email_drafts": a.email_drafts or {},
+            }
+            for a in result.get("articles", [])
+        ],
+    }
+
+    # Load existing history
+    history = load_analysis_history()
+    history.append(history_entry)
+
+    # Keep only last 50 entries to avoid file getting too large
+    if len(history) > 50:
+        history = history[-50:]
+
+    save_analysis_history(history)
+    st.session_state.analysis_history = history
+    return history
+
+
+# Load history on startup
+if not st.session_state.analysis_history:
+    st.session_state.analysis_history = load_analysis_history()
 
 # === Sidebar Controls ===
 with st.sidebar:
@@ -308,6 +391,12 @@ if run_analysis:
                 )
                 st.success(f"✅ Found {len(articles)} relevant article(s).")
                 st.session_state.selected_article_index = 0
+
+                # Add to history
+                add_to_history(
+                    result, agency, st.session_state.browser, st.session_state.headless
+                )
+                logger.info("Analysis added to history")
             else:
                 logger.warning("No articles found in result")
 
@@ -318,77 +407,226 @@ if run_analysis:
     logger.info("Analysis completed")
     logger.info("=" * 60)
 
-# === Article Viewer ===
-output = st.session_state.output
-if output:
-    articles = output.get("articles", [])
-    if articles:
-        logger.debug(f"Displaying {len(articles)} articles in viewer")
-        st.markdown("## 📄 Article Review Panel")
-        articles_sorted = sorted(articles, key=lambda a: not a.relevance.is_relevant)
+# === Tabbed Interface for Current Analysis and History ===
+tab1, tab2 = st.tabs(["📊 Current Analysis", "📚 Analysis History"])
 
-        # Helper to truncate titles
-        def truncate_title(title, max_length=100):
-            return (
-                title if len(title) <= max_length else title[: max_length - 3] + "..."
+with tab1:
+    # === Article Viewer (Current Analysis) ===
+    output = st.session_state.output
+    if output:
+        articles = output.get("articles", [])
+        if articles:
+            logger.debug(f"Displaying {len(articles)} articles in viewer")
+            st.markdown("## 📄 Article Review Panel")
+            articles_sorted = sorted(
+                articles, key=lambda a: not a.relevance.is_relevant
             )
 
-        # Build labels showing truncated title + relevance in backticks
-        labels = [
-            f"{i + 1}. {truncate_title(article.title)}  "
-            f"{'✅ Relevant' if article.relevance.is_relevant else '❌ Not Relevant'}"
-            for i, article in enumerate(articles_sorted)
+            # Helper to truncate titles
+            def truncate_title(title, max_length=100):
+                return (
+                    title
+                    if len(title) <= max_length
+                    else title[: max_length - 3] + "..."
+                )
+
+            # Build labels showing truncated title + relevance in backticks
+            labels = [
+                f"{i + 1}. {truncate_title(article.title)}  "
+                f"{'✅ Relevant' if article.relevance.is_relevant else '❌ Not Relevant'}"
+                for i, article in enumerate(articles_sorted)
+            ]
+
+            # Streamlit selectbox
+            selected_index = st.selectbox(
+                "🗂️ Select Article",
+                options=range(len(articles_sorted)),
+                format_func=lambda i: labels[i],
+            )
+
+            # Get the selected article
+            article = articles_sorted[selected_index]
+            logger.debug(f"User selected article: {article.title[:50]}...")
+
+            # === Relevance
+            st.markdown("### 🧠 Relevance Assessment")
+            st.markdown(f"- **Relevant:** `{article.relevance.is_relevant}`")
+            st.markdown(f"- **Reason:** {article.relevance.reason}")
+
+            # === Article Content
+            st.markdown("### 📰 Article Details")
+            st.markdown(f"**🧾 Title:** {article.title}")
+            st.markdown(
+                f"**🔗 URL:** [View Original]({article.url})", unsafe_allow_html=True
+            )
+            st.markdown("**📃 Content:**")
+            st.write(article.body)
+
+            # === Business Entities
+            st.markdown("### 🏢 Detected Business Entities")
+            if article.business_entities:
+                for e in article.business_entities:
+                    st.markdown(f"- **{e.name}** ({e.type}) — _{e.role}_")
+            else:
+                st.info("No entities found.")
+
+            # === Opportunity
+            st.markdown("### 🚀 Collaboration Opportunity")
+            if article.opportunity:
+                st.markdown(f"**Opportunity:** {article.opportunity.opportunity}")
+                st.markdown(f"**Justification:** {article.opportunity.justification}")
+            else:
+                st.info("No opportunity identified.")
+
+            # === Email Draft
+            st.markdown("### 📧 Outreach Email Draft")
+            if article.email_drafts:
+                selected_entity = st.selectbox(
+                    "Choose Entity", list(article.email_drafts.keys())
+                )
+                st.code(article.email_drafts[selected_entity], language="markdown")
+            else:
+                st.info("No draft available.")
+        else:
+            st.warning("⚠️ No relevant articles available.")
+    else:
+        st.info("Run an analysis to see results here.")
+
+with tab2:
+    # === Analysis History Viewer ===
+    st.markdown("## 📚 Analysis History")
+
+    history = st.session_state.analysis_history
+    if history:
+        st.markdown(f"**Total historical analyses:** {len(history)}")
+
+        # Reverse to show most recent first
+        history_reversed = list(reversed(history))
+
+        # Create selection options
+        history_options = [
+            f"{i+1}. {datetime.fromisoformat(h['timestamp']).strftime('%Y-%m-%d %H:%M')} - "
+            f"{h['agency']} ({h['relevant_count']}/{h['articles_count']} relevant)"
+            for i, h in enumerate(history_reversed)
         ]
 
-        # Streamlit selectbox
-        selected_index = st.selectbox(
-            "🗂️ Select Article",
-            options=range(len(articles_sorted)),
-            format_func=lambda i: labels[i],
+        selected_history_idx = st.selectbox(
+            "Select a past analysis to view:",
+            options=range(len(history_options)),
+            format_func=lambda i: history_options[i],
         )
 
-        # Get the selected article
-        article = articles_sorted[selected_index]
-        logger.debug(f"User selected article: {article.title[:50]}...")
+        if selected_history_idx is not None:
+            selected_history = history_reversed[selected_history_idx]
 
-        # === Relevance
-        st.markdown("### 🧠 Relevance Assessment")
-        st.markdown(f"- **Relevant:** `{article.relevance.is_relevant}`")
-        st.markdown(f"- **Reason:** {article.relevance.reason}")
+            # Display metadata
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Agency", selected_history["agency"])
+            with col2:
+                st.metric("Articles", selected_history["articles_count"])
+            with col3:
+                st.metric("Relevant", selected_history["relevant_count"])
+            with col4:
+                st.metric("Browser", selected_history["browser"])
 
-        # === Article Content
-        st.markdown("### 📰 Article Details")
-        st.markdown(f"**🧾 Title:** {article.title}")
-        st.markdown(
-            f"**🔗 URL:** [View Original]({article.url})", unsafe_allow_html=True
-        )
-        st.markdown("**📃 Content:**")
-        st.write(article.body)
-
-        # === Business Entities
-        st.markdown("### 🏢 Detected Business Entities")
-        if article.business_entities:
-            for e in article.business_entities:
-                st.markdown(f"- **{e.name}** ({e.type}) — _{e.role}_")
-        else:
-            st.info("No entities found.")
-
-        # === Opportunity
-        st.markdown("### 🚀 Collaboration Opportunity")
-        if article.opportunity:
-            st.markdown(f"**Opportunity:** {article.opportunity.opportunity}")
-            st.markdown(f"**Justification:** {article.opportunity.justification}")
-        else:
-            st.info("No opportunity identified.")
-
-        # === Email Draft
-        st.markdown("### 📧 Outreach Email Draft")
-        if article.email_drafts:
-            selected_entity = st.selectbox(
-                "Choose Entity", list(article.email_drafts.keys())
+            st.markdown(
+                f"**Timestamp:** {datetime.fromisoformat(selected_history['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            st.code(article.email_drafts[selected_entity], language="markdown")
-        else:
-            st.info("No draft available.")
+            st.markdown(f"**Headless Mode:** {selected_history['headless']}")
+
+            st.markdown("---")
+
+            # Display articles from history
+            hist_articles = selected_history.get("articles", [])
+            if hist_articles:
+                st.markdown("### Articles from this analysis")
+
+                # Sort by relevance
+                hist_articles_sorted = sorted(
+                    hist_articles,
+                    key=lambda a: not a.get("relevance", {}).get("is_relevant", False),
+                )
+
+                def truncate_title_hist(title, max_length=100):
+                    return (
+                        title
+                        if len(title) <= max_length
+                        else title[: max_length - 3] + "..."
+                    )
+
+                hist_labels = [
+                    f"{i + 1}. {truncate_title_hist(a.get('title', 'Untitled'))}  "
+                    f"{'✅ Relevant' if a.get('relevance', {}).get('is_relevant', False) else '❌ Not Relevant'}"
+                    for i, a in enumerate(hist_articles_sorted)
+                ]
+
+                selected_hist_article_idx = st.selectbox(
+                    "🗂️ Select Article from History",
+                    options=range(len(hist_articles_sorted)),
+                    format_func=lambda i: hist_labels[i],
+                    key="history_article_select",
+                )
+
+                if selected_hist_article_idx is not None:
+                    hist_article = hist_articles_sorted[selected_hist_article_idx]
+
+                    # Display article details
+                    st.markdown("### 🧠 Relevance Assessment")
+                    st.markdown(
+                        f"- **Relevant:** `{hist_article.get('relevance', {}).get('is_relevant', 'Unknown')}`"
+                    )
+                    st.markdown(
+                        f"- **Reason:** {hist_article.get('relevance', {}).get('reason', 'N/A')}"
+                    )
+
+                    st.markdown("### 📰 Article Details")
+                    st.markdown(
+                        f"**🧾 Title:** {hist_article.get('title', 'Untitled')}"
+                    )
+                    st.markdown(
+                        f"**🔗 URL:** [View Original]({hist_article.get('url', '#')})",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown("**📃 Content:**")
+                    st.write(hist_article.get("body", "No content available"))
+
+                    st.markdown("### 🏢 Detected Business Entities")
+                    entities = hist_article.get("business_entities", [])
+                    if entities:
+                        for e in entities:
+                            st.markdown(
+                                f"- **{e.get('name', 'Unknown')}** ({e.get('type', 'N/A')}) — _{e.get('role', 'N/A')}_"
+                            )
+                    else:
+                        st.info("No entities found.")
+
+                    st.markdown("### 🚀 Collaboration Opportunity")
+                    opportunity = hist_article.get("opportunity")
+                    if opportunity:
+                        st.markdown(
+                            f"**Opportunity:** {opportunity.get('opportunity', 'N/A')}"
+                        )
+                        st.markdown(
+                            f"**Justification:** {opportunity.get('justification', 'N/A')}"
+                        )
+                    else:
+                        st.info("No opportunity identified.")
+
+                    st.markdown("### 📧 Outreach Email Draft")
+                    email_drafts = hist_article.get("email_drafts", {})
+                    if email_drafts:
+                        selected_entity_hist = st.selectbox(
+                            "Choose Entity",
+                            list(email_drafts.keys()),
+                            key="history_email_select",
+                        )
+                        st.code(email_drafts[selected_entity_hist], language="markdown")
+                    else:
+                        st.info("No draft available.")
+            else:
+                st.warning("No articles found in this historical entry.")
     else:
-        st.warning("⚠️ No relevant articles available.")
+        st.info(
+            "No analysis history yet. Run an analysis to start building your history."
+        )

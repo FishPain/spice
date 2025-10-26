@@ -1,5 +1,9 @@
+import logging
 from langchain_core.messages import HumanMessage
 from agent.templates import BusinessEntity, GraphState, NewsArticle, OpenAI
+
+# Set up logger for this module
+logger = logging.getLogger("spice.bei")
 
 
 def business_entity_identification(
@@ -34,13 +38,34 @@ def business_entity_identification_node(state: GraphState) -> GraphState:
     """
     For each article marked relevant, run the BEI prompt and keep up to 5 entities.
     """
-    for article in state.get("articles", []):
+    logger.info("=" * 80)
+    logger.info("BUSINESS ENTITY IDENTIFICATION NODE STARTED")
+    logger.info("=" * 80)
+    
+    articles = state.get("articles", [])
+    relevant_articles = [a for a in articles if getattr(a, "relevance", None) and a.relevance.is_relevant]
+    
+    logger.info(f"Identifying business entities for {len(relevant_articles)} relevant articles")
+    
+    for i, article in enumerate(articles, 1):
         if getattr(article, "relevance", None) and article.relevance.is_relevant:
-            result: BusinessEntity = business_entity_identification(
-                state["model"], state["spice_context"], article
-            )
-            # Truncate to top 5
-            article.business_entities = result.entities[:5]
+            logger.info(f"[{i}/{len(articles)}] Processing: {article.title[:60]}...")
+            try:
+                result: BusinessEntity = business_entity_identification(
+                    state["model"], state["spice_context"], article
+                )
+                # Truncate to top 5
+                article.business_entities = result.entities[:5]
+                logger.info(f"[{i}/{len(articles)}] Found {len(article.business_entities)} entities")
+                for entity in article.business_entities:
+                    logger.debug(f"  - {entity.name} ({entity.type}): {entity.role}")
+            except Exception as e:
+                logger.error(f"[{i}/{len(articles)}] Error identifying entities: {e}", exc_info=True)
+                article.business_entities = []
         else:
             article.business_entities = []
+            logger.debug(f"[{i}/{len(articles)}] Skipping (not relevant): {article.title[:60]}...")
+    
+    logger.info("✓ Business entity identification completed")
+    logger.info("=" * 80)
     return state

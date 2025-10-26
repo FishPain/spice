@@ -177,5 +177,6 @@ cython_debug/
 logs/
 *.log
 
-# Scraped data (optional - uncomment if you don't want to track this)
+# Scraped data and analysis history (optional - uncomment if you don't want to track this)
 # all_articles.json
+# analysis_history.json
