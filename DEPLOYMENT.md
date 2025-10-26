@@ -16,7 +16,20 @@ If you see `ImportError: cannot import name 'build_graph' from 'agent.agent'`, t
 2. Commit and push to GitHub
 3. Streamlit Cloud will auto-redeploy
 
-### Solution 3: Check Python Version
+### Solution 3: Playwright Installation
+For Playwright to work on Streamlit Cloud:
+
+1. **System dependencies** - Already configured in `packages.txt`
+2. **Browser installation** - The app now auto-installs browsers on startup using `@st.cache_resource`
+3. **If browsers still fail to install**:
+   - Check Streamlit Cloud logs for Playwright installation messages
+   - Verify `packages.txt` system dependencies were installed
+   - The app uses Chromium by default (most reliable on Linux)
+   - Try changing browser in the sidebar: chromium → firefox → webkit
+
+**Note**: First deployment may take 2-3 minutes while Playwright downloads browsers (~200MB).
+
+### Solution 4: Check Python Version
 Ensure your Streamlit Cloud uses Python 3.9+ (preferably 3.11 or 3.12):
 - Add a `.python-version` file with content: `3.11`
 

@@ -5,6 +5,8 @@ from agent.agent import build_graph
 from agent.context.spice import SPICE_CONTEXT
 import json
 import os
+import sys
+import subprocess
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -56,6 +58,56 @@ logger = setup_logging()
 logger.info("=" * 60)
 logger.info("SPICE Application Started")
 logger.info("=" * 60)
+
+
+# === Install Playwright Browsers ===
+@st.cache_resource
+def install_playwright_browsers():
+    """Install Playwright browsers if not already installed. Runs once per deployment."""
+    try:
+        logger.info("Checking Playwright browser installation...")
+        # Try to install chromium browser
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minute timeout
+        )
+
+        if result.returncode == 0:
+            logger.info("✓ Playwright chromium browser installed successfully")
+            logger.debug(f"Install output: {result.stdout}")
+        else:
+            logger.warning(f"Playwright install returned code {result.returncode}")
+            logger.warning(f"stderr: {result.stderr}")
+
+        # Also try to install system dependencies (may fail on some systems, that's ok)
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "playwright", "install-deps", "chromium"],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            logger.info("✓ Playwright system dependencies installed")
+        except Exception as e:
+            logger.warning(
+                f"Could not install system deps (may be already present): {e}"
+            )
+
+        return True
+    except subprocess.TimeoutExpired:
+        logger.error("❌ Playwright installation timed out")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Error installing Playwright browsers: {e}", exc_info=True)
+        return False
+
+
+# Install browsers on startup
+logger.info("Running Playwright browser installation check...")
+install_playwright_browsers()
+logger.info("Playwright setup complete")
 
 
 # === Authentication ===
