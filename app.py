@@ -5,10 +5,57 @@ from agent.agent import build_graph
 from agent.context.spice import SPICE_CONTEXT
 import json
 import os
+import logging
 from pathlib import Path
+from datetime import datetime
 
 # === Load environment ===
 load_dotenv()
+
+
+# === Configure Logging ===
+def setup_logging():
+    """Configure logging for the application."""
+    # Create logs directory if it doesn't exist
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    # Create log filename with date
+    log_file = log_dir / f"spice_{datetime.now().strftime('%Y%m%d')}.log"
+
+    # Configure logging format
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
+
+    # Get or create logger
+    logger = logging.getLogger("spice")
+    logger.setLevel(logging.INFO)
+
+    # Remove existing handlers to avoid duplicates
+    logger.handlers.clear()
+
+    # File handler - writes to log file
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter(log_format, date_format))
+
+    # Console handler - writes to terminal/console
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(logging.Formatter(log_format, date_format))
+
+    # Add handlers to logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    return logger
+
+
+# Initialize logger
+logger = setup_logging()
+logger.info("=" * 60)
+logger.info("SPICE Application Started")
+logger.info("=" * 60)
 
 
 # === Authentication ===
@@ -22,18 +69,22 @@ def check_password():
         # If no password is set in env, allow access
         if not app_password:
             st.session_state["authenticated"] = True
+            logger.warning("APP_PASSWORD not set - Authentication disabled")
             st.warning("⚠️ No APP_PASSWORD set in environment. Authentication disabled.")
             return
 
         if st.session_state["password"] == app_password:
             st.session_state["authenticated"] = True
+            logger.info("User authenticated successfully")
             del st.session_state["password"]  # Don't store password
         else:
             st.session_state["authenticated"] = False
+            logger.warning("Failed authentication attempt")
 
     # First run - show login form
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
+        logger.info("New session started - authentication required")
 
     # Show login form if not authenticated
     if not st.session_state["authenticated"]:
@@ -89,12 +140,14 @@ with st.sidebar:
     # Logout button at the top
     if st.button("🚪 Logout"):
         st.session_state["authenticated"] = False
+        logger.info("User logged out")
         st.rerun()
 
     st.markdown("---")
 
     # Agency selection
     agency = st.selectbox("🏛️ Select Agency", list(st.session_state.websites.keys()))
+    logger.debug(f"Agency selected: {agency}")
 
     # Add new agency
     st.markdown("---")
@@ -107,13 +160,19 @@ with st.sidebar:
         if submitted:
             if not new_agency_name or not new_agency_url:
                 st.warning("Please provide both name and URL.")
+                logger.warning("Add agency failed: missing name or URL")
             elif not new_agency_url.startswith("http"):
                 st.warning("URL must start with http or https.")
+                logger.warning(
+                    f"Add agency failed: invalid URL format - {new_agency_url}"
+                )
             elif new_agency_name in st.session_state.websites:
                 st.warning("This agency already exists.")
+                logger.warning(f"Add agency failed: duplicate name - {new_agency_name}")
             else:
                 st.session_state.websites[new_agency_name] = new_agency_url
                 st.success(f"✅ Added {new_agency_name}")
+                logger.info(f"New agency added: {new_agency_name} -> {new_agency_url}")
                 agency = new_agency_name  # refresh
 
     st.markdown("---")
@@ -130,17 +189,27 @@ with st.sidebar:
 # === Run Analysis Button ===
 st.markdown("## 🚀 Run Scraper & Analyze Articles")
 if run_analysis:
+    logger.info("=" * 60)
+    logger.info(f"Analysis started for agency: {agency}")
+    logger.info(
+        f"Browser: {st.session_state.browser}, Headless: {st.session_state.headless}"
+    )
+
     with st.spinner("Fetching and analyzing articles..."):
         scraped_path = Path("all_articles.json")
         print("Loading scraped articles from:", scraped_path.resolve())
+        logger.info(f"Loading scraped articles from: {scraped_path.resolve()}")
+
         scraped_articles = (
             json.loads(scraped_path.read_text(encoding="utf-8"))
             if scraped_path.exists()
             else {}
         )
+        logger.info(f"Loaded {len(scraped_articles)} previously scraped articles")
 
         model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
         graph = build_graph().compile()
+        logger.info("Graph compiled successfully")
 
         try:
             inputs = {
@@ -154,7 +223,10 @@ if run_analysis:
                 "browser": st.session_state.browser,
             }
 
+            logger.info("Invoking graph with inputs...")
             result = graph.invoke(inputs)
+            logger.info("Graph execution completed")
+
             st.session_state.output = result
 
             # Save updated article state
@@ -166,20 +238,34 @@ if run_analysis:
                 ),
                 encoding="utf-8",
             )
+            logger.info(
+                f"Saved {len(result.get('scraped_articles', {}))} articles to {scraped_path}"
+            )
 
             articles = result.get("articles", [])
             if articles:
+                relevant_count = sum(1 for a in articles if a.relevance.is_relevant)
+                logger.info(
+                    f"Found {len(articles)} articles, {relevant_count} relevant"
+                )
                 st.success(f"✅ Found {len(articles)} relevant article(s).")
                 st.session_state.selected_article_index = 0
+            else:
+                logger.warning("No articles found in result")
 
         except Exception as e:
+            logger.error(f"Error during analysis: {str(e)}", exc_info=True)
             st.error(f"❌ Error during analysis:\n\n`{e}`")
+
+    logger.info("Analysis completed")
+    logger.info("=" * 60)
 
 # === Article Viewer ===
 output = st.session_state.output
 if output:
     articles = output.get("articles", [])
     if articles:
+        logger.debug(f"Displaying {len(articles)} articles in viewer")
         st.markdown("## 📄 Article Review Panel")
         articles_sorted = sorted(articles, key=lambda a: not a.relevance.is_relevant)
 
@@ -205,6 +291,8 @@ if output:
 
         # Get the selected article
         article = articles_sorted[selected_index]
+        logger.debug(f"User selected article: {article.title[:50]}...")
+
         # === Relevance
         st.markdown("### 🧠 Relevance Assessment")
         st.markdown(f"- **Relevant:** `{article.relevance.is_relevant}`")
