@@ -206,7 +206,7 @@ if run_analysis:
         )
         logger.info(f"Loaded {len(scraped_articles)} previously scraped articles")
 
-        model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        model = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
         graph = build_graph().compile()
         logger.info("Graph compiled successfully")
 
