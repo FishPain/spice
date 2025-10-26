@@ -66,25 +66,31 @@ def install_playwright_browsers():
     """Install Playwright browsers if not already installed. Runs once per deployment."""
     try:
         logger.info("Checking Playwright browser installation...")
-        # Try to install chromium browser
-        result = subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
-            capture_output=True,
-            text=True,
-            timeout=300,  # 5 minute timeout
-        )
 
-        if result.returncode == 0:
-            logger.info("✓ Playwright chromium browser installed successfully")
-            logger.debug(f"Install output: {result.stdout}")
-        else:
-            logger.warning(f"Playwright install returned code {result.returncode}")
-            logger.warning(f"stderr: {result.stderr}")
+        # Install all browsers (chromium, firefox, webkit)
+        browsers = ["chromium", "firefox", "webkit"]
+        for browser in browsers:
+            logger.info(f"Installing {browser}...")
+            result = subprocess.run(
+                [sys.executable, "-m", "playwright", "install", browser],
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout per browser
+            )
+
+            if result.returncode == 0:
+                logger.info(f"✓ Playwright {browser} browser installed successfully")
+            else:
+                logger.warning(
+                    f"Playwright {browser} install returned code {result.returncode}"
+                )
+                logger.warning(f"stderr: {result.stderr}")
 
         # Also try to install system dependencies (may fail on some systems, that's ok)
         try:
+            logger.info("Installing system dependencies...")
             subprocess.run(
-                [sys.executable, "-m", "playwright", "install-deps", "chromium"],
+                [sys.executable, "-m", "playwright", "install-deps"],
                 capture_output=True,
                 text=True,
                 timeout=300,
