@@ -25,3 +25,7 @@ libxcb-shm0
 libxshmfence1
 fonts-liberation
 libdbus-glib-1-2
+libxcursor1
+libgtk-3-0
+libgdk-pixbuf2.0-0
+libcairo-gobject2
