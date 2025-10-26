@@ -53,10 +53,10 @@ def relevance_scoring_node(state: GraphState) -> GraphState:
     logger.info("=" * 80)
     logger.info("RELEVANCE SCORING NODE STARTED")
     logger.info("=" * 80)
-    
+
     articles = state.get("articles", [])
     logger.info(f"Scoring relevance for {len(articles)} articles")
-    
+
     relevant_count = 0
     for i, article in enumerate(articles, 1):
         logger.info(f"[{i}/{len(articles)}] Scoring: {article.title[:60]}...")
@@ -66,12 +66,20 @@ def relevance_scoring_node(state: GraphState) -> GraphState:
             )
             if article.relevance.is_relevant:
                 relevant_count += 1
-                logger.info(f"[{i}/{len(articles)}] ✓ RELEVANT - {article.relevance.reason}")
+                logger.info(
+                    f"[{i}/{len(articles)}] ✓ RELEVANT - {article.relevance.reason}"
+                )
             else:
-                logger.info(f"[{i}/{len(articles)}] ✗ NOT RELEVANT - {article.relevance.reason}")
+                logger.info(
+                    f"[{i}/{len(articles)}] ✗ NOT RELEVANT - {article.relevance.reason}"
+                )
         except Exception as e:
-            logger.error(f"[{i}/{len(articles)}] Error scoring relevance: {e}", exc_info=True)
-    
-    logger.info(f"✓ Relevance scoring completed: {relevant_count}/{len(articles)} relevant")
+            logger.error(
+                f"[{i}/{len(articles)}] Error scoring relevance: {e}", exc_info=True
+            )
+
+    logger.info(
+        f"✓ Relevance scoring completed: {relevant_count}/{len(articles)} relevant"
+    )
     logger.info("=" * 80)
     return state

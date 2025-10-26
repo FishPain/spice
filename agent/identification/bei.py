@@ -41,12 +41,16 @@ def business_entity_identification_node(state: GraphState) -> GraphState:
     logger.info("=" * 80)
     logger.info("BUSINESS ENTITY IDENTIFICATION NODE STARTED")
     logger.info("=" * 80)
-    
+
     articles = state.get("articles", [])
-    relevant_articles = [a for a in articles if getattr(a, "relevance", None) and a.relevance.is_relevant]
-    
-    logger.info(f"Identifying business entities for {len(relevant_articles)} relevant articles")
-    
+    relevant_articles = [
+        a for a in articles if getattr(a, "relevance", None) and a.relevance.is_relevant
+    ]
+
+    logger.info(
+        f"Identifying business entities for {len(relevant_articles)} relevant articles"
+    )
+
     for i, article in enumerate(articles, 1):
         if getattr(article, "relevance", None) and article.relevance.is_relevant:
             logger.info(f"[{i}/{len(articles)}] Processing: {article.title[:60]}...")
@@ -56,16 +60,23 @@ def business_entity_identification_node(state: GraphState) -> GraphState:
                 )
                 # Truncate to top 5
                 article.business_entities = result.entities[:5]
-                logger.info(f"[{i}/{len(articles)}] Found {len(article.business_entities)} entities")
+                logger.info(
+                    f"[{i}/{len(articles)}] Found {len(article.business_entities)} entities"
+                )
                 for entity in article.business_entities:
                     logger.debug(f"  - {entity.name} ({entity.type}): {entity.role}")
             except Exception as e:
-                logger.error(f"[{i}/{len(articles)}] Error identifying entities: {e}", exc_info=True)
+                logger.error(
+                    f"[{i}/{len(articles)}] Error identifying entities: {e}",
+                    exc_info=True,
+                )
                 article.business_entities = []
         else:
             article.business_entities = []
-            logger.debug(f"[{i}/{len(articles)}] Skipping (not relevant): {article.title[:60]}...")
-    
+            logger.debug(
+                f"[{i}/{len(articles)}] Skipping (not relevant): {article.title[:60]}..."
+            )
+
     logger.info("✓ Business entity identification completed")
     logger.info("=" * 80)
     return state

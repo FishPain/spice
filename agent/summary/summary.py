@@ -51,7 +51,7 @@ def summary_node(state: GraphState) -> GraphState:
     logger.info("=" * 80)
     logger.info("SUMMARY NODE STARTED")
     logger.info("=" * 80)
-    
+
     articles = state.get("articles", [])
     if not articles:
         logger.warning("No articles to summarize")
@@ -59,14 +59,18 @@ def summary_node(state: GraphState) -> GraphState:
         return state
 
     logger.info(f"Summarizing {len(articles)} articles")
-    
+
     for i, article in enumerate(articles, 1):
         logger.info(f"[{i}/{len(articles)}] Summarizing: {article.title[:60]}...")
         try:
             article.body = summary(state["model"], state["spice_context"], article)
-            logger.debug(f"[{i}/{len(articles)}] Summary length: {len(article.body)} chars")
+            logger.debug(
+                f"[{i}/{len(articles)}] Summary length: {len(article.body)} chars"
+            )
         except Exception as e:
-            logger.error(f"[{i}/{len(articles)}] Error summarizing article: {e}", exc_info=True)
+            logger.error(
+                f"[{i}/{len(articles)}] Error summarizing article: {e}", exc_info=True
+            )
 
     logger.info("✓ Summary node completed")
     logger.info("=" * 80)
