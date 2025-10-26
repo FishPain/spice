@@ -135,6 +135,7 @@ def check_password():
             st.session_state["authenticated"] = True
             logger.info("User authenticated successfully")
             del st.session_state["password"]  # Don't store password
+            st.rerun()  # Immediately reload to show authenticated app
         else:
             st.session_state["authenticated"] = False
             logger.warning("Failed authentication attempt")
