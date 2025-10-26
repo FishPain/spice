@@ -119,12 +119,34 @@ if output:
     articles = output.get("articles", [])
     if articles:
         st.markdown("## 📄 Article Review Panel")
+        articles_sorted = sorted(articles, key=lambda a: not a.relevance.is_relevant)
+
+        # Helper to truncate titles
+        def truncate_title(title, max_length=100):
+            return (
+                title if len(title) <= max_length else title[: max_length - 3] + "..."
+            )
+
+        # Build labels showing truncated title + relevance in backticks
+        labels = [
+            f"{i + 1}. {truncate_title(article.title)}  "
+            f"{'✅ Relevant' if article.relevance.is_relevant else '❌ Not Relevant'}"
+            for i, article in enumerate(articles_sorted)
+        ]
+
+        # Streamlit selectbox
         selected_index = st.selectbox(
             "🗂️ Select Article",
-            options=range(len(articles)),
-            format_func=lambda i: f"{i + 1}. {articles[i].title}",
+            options=range(len(articles_sorted)),
+            format_func=lambda i: labels[i],
         )
-        article = articles[selected_index]
+
+        # Get the selected article
+        article = articles_sorted[selected_index]
+        # === Relevance
+        st.markdown("### 🧠 Relevance Assessment")
+        st.markdown(f"- **Relevant:** `{article.relevance.is_relevant}`")
+        st.markdown(f"- **Reason:** {article.relevance.reason}")
 
         # === Article Content
         st.markdown("### 📰 Article Details")
@@ -134,11 +156,6 @@ if output:
         )
         st.markdown("**📃 Content:**")
         st.write(article.body)
-
-        # === Relevance
-        st.markdown("### 🧠 Relevance Assessment")
-        st.markdown(f"- **Relevant:** `{article.relevance.is_relevant}`")
-        st.markdown(f"- **Reason:** {article.relevance.reason}")
 
         # === Business Entities
         st.markdown("### 🏢 Detected Business Entities")

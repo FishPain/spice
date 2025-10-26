@@ -7,34 +7,34 @@ def relevance_scoring(
     model: OpenAI, spice_context: str, article: NewsArticle
 ) -> RelevanceScore:
     """
-    This node checks if the content is relevant to the query.
-    If it is, it sets the state to True and continues to the next node.
-    If not, it sets the state to False and goes to the out_of_scope node.
+    This node checks relevance ONLY if there is clear potential funding
+    and/or collaboration with private companies (not government-only news).
     """
     prompt = f"""
-You are an expert relevance evaluator working for SPICE (SIT-Polytechnic Innovation Centre of Excellence), a department that supports industry collaborations in applied R&D and innovation projects.
+You are an expert relevance evaluator for SPICE (SIT-Polytechnic Innovation Centre of Excellence).
 
-Your goal is to determine whether the following article is relevant for SPICE to consider reaching out to the organization(s) mentioned, based on SPICE’s domain expertise, capabilities, and mission.
+Evaluate the article **ONLY** on whether it signals a near- to mid-term opportunity for SPICE to:
+- **Receive or access funds** (e.g., grants, corporate R&D funding, venture funding, investment rounds tied to R&D, funded pilots, sponsored projects, procurement with budget),
+- **Collaborate with private companies** (e.g., partnerships, MoUs, joint development, paid pilots, RFPs/RFIs from companies, consortiums with corporate members).
 
-Use the provided context about SPICE to assess:
-- Is there a potential opportunity for SPICE to collaborate with the company or agency mentioned?
-- Does the article describe any problems, initiatives, or projects that align with SPICE's technical capabilities or research interests?
+Deprioritize / mark **not relevant** if:
+- It’s **government-only** (policy, ministry announcements, public programs) **without** a specific private company partnership or funded call SPICE could join.
+- It’s generic PR, hiring news, awards, or leadership changes with **no funding** or **no concrete company collaboration path**.
+- It’s far-future or speculative with no actionable funding/collab angle.
 
-Based on SPICE’s mission and domain expertise, decide:
+When **relevant**, briefly point to the company(ies), the funding/collab mechanism, and why it fits SPICE’s capabilities.
 
-1. **is_relevant**: true/false — should SPICE reach out?
-2. **reason**: a short justification.
-3. **relevant_domains**: pick from SPICE’s domains.  
+Return valid JSON per the Pydantic schema with:
+1. "is_relevant": true/false
+2. "reason": one short sentence
+3. "relevant_domains": pick from SPICE’s domains, only if relevant
 
-Return valid JSON matching the Pydantic model schema.
-
-### SPICE Context:
+### SPICE Context
 {spice_context}
 
-### Article Content:
+### Article Content
 {article.body}
 """
-
     structured_output_parser = model.with_structured_output(RelevanceScore)
     decision_response = structured_output_parser.invoke([HumanMessage(content=prompt)])
     return decision_response

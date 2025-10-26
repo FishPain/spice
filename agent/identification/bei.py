@@ -13,6 +13,7 @@ def business_entity_identification(
 You are a business entity identification expert for SPICE (SIT-Polytechnic Innovation Centre of Excellence).
 Extract up to **5** organizations mentioned in this article that SPICE could collaborate with.
 Relevance means the entity plays a major role (leading an initiative, receiving funding/licenses, or partnering).
+Do not include government agencies at all. Only include companies that are directly mentioned in the article.
 Return JSON with a single key `entities`, a list of objects each having:
 - `name`: full organization name
 - `type`: "company" or "government agency"
