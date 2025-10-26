@@ -1,4 +1,3 @@
-# System dependencies for Playwright Chromium on Ubuntu/Debian
 libnss3
 libnspr4
 libatk1.0-0
