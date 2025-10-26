@@ -1,6 +1,6 @@
 from typing import List, TypedDict
 from langgraph.graph import StateGraph, START, END
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 
 from agent.scoring.relevance import relevance_scoring_node
 from agent.scraping.webscrape import web_scrape_node

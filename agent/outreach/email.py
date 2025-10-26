@@ -1,4 +1,4 @@
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 from agent.templates import GraphState, NewsArticle, OpenAI
 
 
