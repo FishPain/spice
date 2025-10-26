@@ -197,7 +197,6 @@ if run_analysis:
 
     with st.spinner("Fetching and analyzing articles..."):
         scraped_path = Path("all_articles.json")
-        print("Loading scraped articles from:", scraped_path.resolve())
         logger.info(f"Loading scraped articles from: {scraped_path.resolve()}")
 
         scraped_articles = (
